@@ -289,7 +289,7 @@ def main():
                         
                         # Display the uploaded PDF
                         st.header("Uploaded PDF")
-                        display_pdf(pdf_path)
+                        display_pdf_native(file_path)
                     except Exception as e:
                         st.error(f"Error processing PDF: {str(e)}")
                         # Clean up the temporary file
