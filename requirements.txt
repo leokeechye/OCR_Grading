@@ -4,3 +4,4 @@ dotenv
 Pillow
 langgraph
 google-generativeai
+PyMuPDF
