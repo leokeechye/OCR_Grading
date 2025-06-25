@@ -7,15 +7,24 @@ from PIL import Image
 import io
 from mistralai import DocumentURLChunk, ImageURLChunk
 from mistralai.models import OCRResponse
-from dotenv import find_dotenv, load_dotenv
 import google.generativeai as genai
 
-# Load environment variables
-load_dotenv(find_dotenv())
+# Load environment variables for deployment
+def load_config():
+    """Load configuration from Streamlit secrets or environment variables"""
+    try:
+        # Try Streamlit secrets first (for Streamlit Cloud)
+        api_key = st.secrets.get('MISTRAL_API_KEY', '')
+        google_api_key = st.secrets.get('GOOGLE_API_KEY', '')
+    except:
+        # Fallback to environment variables (for other platforms)
+        api_key = os.getenv('MISTRAL_API_KEY', '')
+        google_api_key = os.getenv('GOOGLE_API_KEY', '')
+    
+    return api_key, google_api_key
 
 # Global API keys
-api_key = os.getenv('MISTRAL_API_KEY', '')
-google_api_key = os.getenv('GOOGLE_API_KEY', '')
+api_key, google_api_key = load_config()
 
 # Initialize client function with proper error handling
 def initialize_mistral_client(api_key):
@@ -68,9 +77,6 @@ def upload_pdf(client, content, filename):
             return signed_url.url
         except Exception as e:
             raise ValueError(f"Error uploading PDF: {str(e)}")
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
 
 def replace_images_in_markdown(markdown_str: str, images_dict: dict) -> str:
     """Replace image placeholders with base64 encoded images in markdown."""
@@ -88,16 +94,6 @@ def get_combined_markdown(ocr_response: OCRResponse) -> str:
         markdowns.append(replace_images_in_markdown(page.markdown, image_data))
 
     return "\n\n".join(markdowns)
-
-def display_pdf_native(file_path):
-    """Display PDF using Streamlit's native PDF viewer"""
-    with open(file_path, "rb") as f:
-        st.download_button(
-            label="📄 Download PDF to view",
-            data=f.read(),
-            file_name=os.path.basename(file_path),
-            mime="application/pdf"
-        )
 
 def process_ocr(client, document_source):
     """Process document with OCR API based on source type"""
@@ -141,10 +137,6 @@ If you can find information related to the query in the document, please answer 
 If the document doesn't specifically mention the exact information asked, please try to infer from related content or clearly state that the specific information isn't available in the document.
 """
         
-        # Print for debugging
-        print(f"Sending prompt with {len(context)} characters of context")
-        print(f"First 500 chars of context: {context[:500]}...")
-        
         # Generate response
         model = genai.GenerativeModel('gemma-3-27b-it')
         
@@ -183,9 +175,6 @@ If the document doesn't specifically mention the exact information asked, please
         return response.text
         
     except Exception as e:
-        print(f"Error generating response: {str(e)}")
-        import traceback
-        print(traceback.format_exc())
         return f"Error generating response: {str(e)}"
 
 # Streamlit UI
@@ -198,27 +187,27 @@ def main():
     with st.sidebar:
         st.header("Settings")
         
-        # API key inputs
-        api_key_tab1, api_key_tab2 = st.tabs(["Mistral API", "Google API"])
-        
-        with api_key_tab1:
-            # Get Mistral API key from environment or user input
-            user_api_key = st.text_input("Mistral API Key", value=api_key if api_key else "", type="password")
-            if user_api_key:
-                api_key = user_api_key
-                os.environ["MISTRAL_API_KEY"] = api_key
-        
-        with api_key_tab2:
-            # Get Google API key
-            user_google_api_key = st.text_input(
-                "Google API Key", 
-                value=google_api_key if google_api_key else "", 
-                type="password",
-                help="API key for Google Gemini to use for response generation"
-            )
-            if user_google_api_key:
-                google_api_key = user_google_api_key
-                os.environ["GOOGLE_API_KEY"] = google_api_key
+        # API key inputs - only show if not already configured
+        if not api_key or not google_api_key:
+            st.warning("⚠️ API keys need to be configured for the app to work properly.")
+            
+            # API key inputs
+            api_key_tab1, api_key_tab2 = st.tabs(["Mistral API", "Google API"])
+            
+            with api_key_tab1:
+                user_api_key = st.text_input("Mistral API Key", value=api_key if api_key else "", type="password")
+                if user_api_key and user_api_key != api_key:
+                    api_key = user_api_key
+            
+            with api_key_tab2:
+                user_google_api_key = st.text_input(
+                    "Google API Key", 
+                    value=google_api_key if google_api_key else "", 
+                    type="password",
+                    help="API key for Google Gemini to use for response generation"
+                )
+                if user_google_api_key and user_google_api_key != google_api_key:
+                    google_api_key = user_google_api_key
         
         # Initialize Mistral client with the API key
         mistral_client = None
@@ -275,11 +264,6 @@ def main():
                 if uploaded_file and st.button("Process PDF"):
                     content = uploaded_file.read()
                     
-                    # Save the uploaded PDF temporarily for display purposes
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                        tmp.write(content)
-                        pdf_path = tmp.name
-                    
                     try:
                         # Prepare document source for OCR processing
                         document_source = {
@@ -287,14 +271,23 @@ def main():
                             "document_url": upload_pdf(mistral_client, content, uploaded_file.name)
                         }
                         
-                        # Display the uploaded PDF
-                        st.header("Uploaded PDF")
-                        display_pdf_native(file_path)
+                        # Show success message and download option
+                        st.success("✅ PDF uploaded and processed successfully!")
+                        
+                        # Provide download button for user to view the original
+                        st.download_button(
+                            label="📥 Download Original PDF",
+                            data=content,
+                            file_name=uploaded_file.name,
+                            mime="application/pdf",
+                            help="Download to view the original PDF file"
+                        )
+                        
+                        st.info("💡 The document content will be extracted and available for chat once processing completes.")
+                        
                     except Exception as e:
                         st.error(f"Error processing PDF: {str(e)}")
-                        # Clean up the temporary file
-                        if os.path.exists(pdf_path):
-                            os.unlink(pdf_path)
+                        document_source = None
             
             elif input_method == "Image Upload":
                 uploaded_image = st.file_uploader("Choose Image file", type=["png", "jpg", "jpeg"])
