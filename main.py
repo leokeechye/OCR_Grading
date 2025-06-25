@@ -14,8 +14,8 @@ import google.generativeai as genai
 load_dotenv(find_dotenv())
 
 # Global API keys
-api_key = os.getenv('MISTRAL_API_KEY', '')
-google_api_key = os.getenv('GOOGLE_API_KEY', '')
+api_key = st.secrets.get('MISTRAL_API_KEY', '')
+google_api_key = st.secrets.get('GOOGLE_API_KEY', '')
 
 # Initialize client function with proper error handling
 def initialize_mistral_client(api_key):
