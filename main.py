@@ -14,8 +14,8 @@ import google.generativeai as genai
 load_dotenv(find_dotenv())
 
 # Global API keys
-api_key = st.secrets.get('MISTRAL_API_KEY', '')
-google_api_key = st.secrets.get('GOOGLE_API_KEY', '')
+api_key = os.getenv('MISTRAL_API_KEY', '')
+google_api_key = os.getenv('GOOGLE_API_KEY', '')
 
 # Initialize client function with proper error handling
 def initialize_mistral_client(api_key):
@@ -89,12 +89,15 @@ def get_combined_markdown(ocr_response: OCRResponse) -> str:
 
     return "\n\n".join(markdowns)
 
-def display_pdf(file):
-    """Displays a PDF in Streamlit using an iframe."""
-    with open(file, "rb") as f:
-        base64_pdf = base64.b64encode(f.read()).decode("utf-8")
-        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="1000" type="application/pdf"></iframe>'
-        st.markdown(pdf_display, unsafe_allow_html=True)
+def display_pdf_native(file_path):
+    """Display PDF using Streamlit's native PDF viewer"""
+    with open(file_path, "rb") as f:
+        st.download_button(
+            label="📄 Download PDF to view",
+            data=f.read(),
+            file_name=os.path.basename(file_path),
+            mime="application/pdf"
+        )
 
 def process_ocr(client, document_source):
     """Process document with OCR API based on source type"""
