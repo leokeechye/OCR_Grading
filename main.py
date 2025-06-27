@@ -137,14 +137,14 @@ If you can find information related to the query in the document, please answer 
 If the document doesn't specifically mention the exact information asked, please try to infer from related content or clearly state that the specific information isn't available in the document.
 """
         
-        # Generate response using Gemini 2.0 Flash
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        # Generate response using Gemini 2.5 Flash
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         generation_config = {
             "temperature": 0.4,
             "top_p": 0.8,
             "top_k": 40,
-            "max_output_tokens": 8192,  # Increased for Gemini 2.0 Flash
+            "max_output_tokens": 8192,  # Increased for Gemini 2.5 Flash
         }
         
         safety_settings = [
